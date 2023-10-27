@@ -2,7 +2,7 @@
 const express = require("express");
 const { MongoClient, ServerApiVersion } = require('mongodb');
 /*IMPORT SECTION END */
-const uri = "mongodb+srv://admin:CTXP6a77pU58QlJA@inventariofarmacicluste.1k8lix8.mongodb.net/?retryWrites=true&w=majority"
+const uri = "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.0.1"
 
 
 /* ############## QUERY SECTION START ####################*/
@@ -15,26 +15,17 @@ const client = new MongoClient(uri,{
 });
 
 async function retrieveAllDrugList(){ return await client.db("DRUGS").collection("DRUGS").find({}).toArray();}
-async function retrieveDrugById(drugId) { return await client.db("DRUGS").collection("DRUGS").find({_id: drugId}).toArray(); }
 
 async function  insertDrug(item){
     return await client.db("DRUGS").collection("DRUGS").insertOne(item);
 }
 
 async function  updateDrugById(drugId, newItem){
-   try{
-        return await Database.updateOne(drugId,newItem, (err, res) =>{
-            if(err) throw err;
-            res = "Document Successfully updated"
-            console.log(res);
-            return res;
-        });
-    }finally{client.close()}
+    //TODO
 }
 
-async function  deleteDrugById(drugId){
-    try{ return await Database.deleteOne(drugId);}
-    finally{ closeDBConnection(); }
+async function  deleteDrugById(){
+  return await client.db("DRUGS").collection("DRUGS").deleteMany({})
 }
 /* ############## QUERY SECTION END ####################*/
 
@@ -47,15 +38,23 @@ const router = express.Router();
 /** GET ALL DATA  **/
 router.get('/drugList',  async function(request, response){
     const drugList = await retrieveAllDrugList()
-    console.log(drugList);
+    response.send(drugList);
 });
 
-/** GET DATA BY ID **/
-router.get(`/drugItemByID`, function(request, response){
-  console.log(request.body);
-    // const drugItem = retrieveDrugById(request.params())
-    // response.send(drugItem);
+/** GET NOTIFICATION **/
+
+router.get(`/notifications`, async function(request,response){
+   const drugList = await retrieveAllDrugList();
+   const current_date = new Date();
+   let response_object = []; 
+   for(let index=0; index< drugList.length; index++){
+     response_object[index]=checkDates(drugList[index].drugExpirationDate, current_date, drugList[index].drugName);
+   }
+  
+    response.send(response_object);
 });
+
+
 
 //POST MPPING
 /** INSERT DATA **/
@@ -75,14 +74,35 @@ router.put('/updateDrug/drug_id', function(request, response){
 
 //DELETE MAPPING
 /** DELETE DATA by ID **/
-router.delete('/deleteDrug/drug_id', function(request, response){
+router.delete('/deleteDrug', function(request, response){
     console.log("Request recieved: ", request);
-    const respFromDb = deleteDrugById(request.params(),request.body());
+    const respFromDb = deleteDrugById();
     response.send(respFromDb);
+
 });
 
 router.use('/', (req, res, next) => {
     res.status(404).json({error : "page not found"});
 });
+
+
+
+function checkDates(expirationDate, currentDate, name) {
+    const expirationDateObj = new Date(expirationDate);
+    const currentDateObj = new Date(currentDate);
+    const DIVIDER = (1000 * 60 * 60 * 24);
+    const daysDifference = (expirationDateObj - currentDateObj) / DIVIDER
+
+    if (expirationDateObj > currentDateObj) {return { "drugName": name, "daysToExpire": 0, "daysSinceExpired":daysDifference};}
+    else {
+      if (expirationDateObj.getMonth() - currentDateObj.getMonth() < 1){ return { "drugName": name, "daysToExpire": daysDifference,"daysSinceExpired":0};}
+      else {
+        if (expirationDateObj.getDate() - currentDateObj.getDate() < 7)  return { "drugName": name,"daysToExpire": daysDifference,"daysSinceExpired":0} 
+        else if ((expirationDateObj - currentDateObj) < 3) { return {"drugName": name,"daysToExpire": daysToExpire,"daysSinceExpired":0};}
+      }
+    }
+  }
+
+  
 
 module.exports = router;

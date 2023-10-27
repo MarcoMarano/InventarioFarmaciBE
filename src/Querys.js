@@ -55,4 +55,3 @@ async function  deleteDrugById(drugId){
                 .collection("DRUGS")
                 .deleteOne(drugId);
 }
-
