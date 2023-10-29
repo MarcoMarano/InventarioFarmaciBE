@@ -34,8 +34,8 @@ async function  updateDrugById(drugId, newItem){
             });
 }
 
-async function  deleteDrugById(){
-  return await client.db("DRUGS").collection("DRUGS").deleteMany({})
+async function  deleteDrugById(drugId){
+  return await client.db("DRUGS").collection("DRUGS").deleteOne({_id: new ObjectId(drugId)});
 }
 /* ############## QUERY SECTION END ####################*/
 
@@ -79,9 +79,9 @@ router.put('/drug/:drugId', function(request, response){
 
 //DELETE MAPPING
 /** DELETE DATA by ID **/
-router.delete('/drug', function(request, response){
+router.delete('/drug/:drugId', function(request, response){
     console.log("Request recieved: ", request);
-    const respFromDb = deleteDrugById();
+    const respFromDb = deleteDrugById(request.params.drugId);
     response.send(respFromDb);
 
 });
