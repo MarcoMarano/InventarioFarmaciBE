@@ -1,6 +1,6 @@
 /*IMPORT SECTION START */
 const express = require("express");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 /*IMPORT SECTION END */
 const uri = "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.0.1"
 
@@ -21,7 +21,17 @@ async function  insertDrug(item){
 }
 
 async function  updateDrugById(drugId, newItem){
-    //TODO
+    return client.db("DRUGS")
+          .collection("DRUGS")
+          .replaceOne(
+            {_id: new ObjectId(drugId)},
+            {
+              _id:new ObjectId(drugId),
+              drugName:newItem["drugName"],
+              drugDescription:newItem["drugDescription"],
+              drugInsertionDate:newItem["drugInsertionDate"],
+              drugExpirationDate:newItem["drugExpirationDate"]
+            });
 }
 
 async function  deleteDrugById(){
@@ -29,14 +39,12 @@ async function  deleteDrugById(){
 }
 /* ############## QUERY SECTION END ####################*/
 
-
-
 /* ######################### ROUTING SECTION #############################*/
 
 const router = express.Router();
 // GET MAPPING
 /** GET ALL DATA  **/
-router.get('/drugList',  async function(request, response){
+router.get('/drugs',  async function(request, response){
     const drugList = await retrieveAllDrugList()
     response.send(drugList);
 });
@@ -54,27 +62,24 @@ router.get(`/notifications`, async function(request,response){
     response.send(response_object);
 });
 
-
-
 //POST MPPING
 /** INSERT DATA **/
 
-router.post('/insertDrug', async function(request, response){
+router.post('/drug', async function(request, response){
     const respFromDb = await insertDrug(request.body);
     response.send(respFromDb);
 });
 
 //PUT MAPPING
 /** UPDATE DATA BY ID **/
-router.put('/updateDrug/drug_id', function(request, response){
-    console.log("Request recieved: ", request);
-    const respFromDb = updateDrugById(request.params(), request.body());
+router.put('/drug/:drugId', function(request, response){
+    const respFromDb = updateDrugById(request.params.drugId,request.body);
     response.send(respFromDb);
 });
 
 //DELETE MAPPING
 /** DELETE DATA by ID **/
-router.delete('/deleteDrug', function(request, response){
+router.delete('/drug', function(request, response){
     console.log("Request recieved: ", request);
     const respFromDb = deleteDrugById();
     response.send(respFromDb);
@@ -85,7 +90,7 @@ router.use('/', (req, res, next) => {
     res.status(404).json({error : "page not found"});
 });
 
-
+/* ######################### UTILITY METHODS SECTION #############################*/
 
 function checkDates(expirationDate, currentDate, name) {
     const expirationDateObj = new Date(expirationDate);
@@ -93,12 +98,15 @@ function checkDates(expirationDate, currentDate, name) {
     const DIVIDER = (1000 * 60 * 60 * 24);
     const daysDifference = (expirationDateObj - currentDateObj) / DIVIDER
 
-    if (expirationDateObj > currentDateObj) {return { "drugName": name, "daysToExpire": 0, "daysSinceExpired":daysDifference};}
+    if (expirationDateObj < currentDateObj){
+      //e' gia' scaduto
+      return { "drugName": name, "daysToExpire": 0, "daysSinceExpired":Math.abs(Math.round(daysDifference))};}
     else {
-      if (expirationDateObj.getMonth() - currentDateObj.getMonth() < 1){ return { "drugName": name, "daysToExpire": daysDifference,"daysSinceExpired":0};}
+      //deve ancora scadere
+      if (expirationDateObj.getMonth() - currentDateObj.getMonth() < 1){ return { "drugName": name, "daysToExpire": Math.round(daysDifference),"daysSinceExpired":0};}
       else {
-        if (expirationDateObj.getDate() - currentDateObj.getDate() < 7)  return { "drugName": name,"daysToExpire": daysDifference,"daysSinceExpired":0} 
-        else if ((expirationDateObj - currentDateObj) < 3) { return {"drugName": name,"daysToExpire": daysToExpire,"daysSinceExpired":0};}
+        if (expirationDateObj.getDate() - currentDateObj.getDate() < 7)  return { "drugName": name,"daysToExpire": Math.round(daysDifference),"daysSinceExpired":0} 
+        else if ((expirationDateObj - currentDateObj) < 3) { return {"drugName": name,"daysToExpire": Math.round(daysDifference),"daysSinceExpired":0};}
       }
     }
   }
